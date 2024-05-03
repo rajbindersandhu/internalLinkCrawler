@@ -2,6 +2,7 @@ import { JSDOM } from "jsdom";
 
 function normalizeURL(urlString){
     const url = new URL(urlString)
+    
     const hostName = url.hostname
     let pathName = url.pathname
     if (pathName.toString().endsWith("/")){
@@ -11,6 +12,14 @@ function normalizeURL(urlString){
 }
 
 function convertRelativeToAbs(urlString, baseUrlString){
+    try{
+        const urlObj = new URL(urlString)
+        if (urlObj.protocol && urlObj.hostname){
+            return urlString
+        }
+    }catch{}
+    
+
     const baseUrlObj = new URL(baseUrlString)
     let absoluteUrlString = urlString
     if (baseUrlObj.pathname && !urlString.includes(baseUrlObj.pathname)){
@@ -51,21 +60,48 @@ function getAnchorEle(htmlString){
 function getUrlFromHtml(htmlString, baseUrl){
     const urlArray = getAnchorEle(htmlString);
     let absUrlArray = [];
-    urlArray.forEach((url) => absUrlArray.push(convertRelativeToAbs(url, baseUrl)));
+    urlArray.forEach((url) => absUrlArray.push(normalizeURL(convertRelativeToAbs(url, baseUrl))));
     return absUrlArray
 }
 
-async function crawlPage(url){
+async function fetchHTML(url){
     const res = await fetch(url);
     if (res.status>=400){
-        throw new Error(`Request failed with ${res.status}status`)
+        console.log(`Request failed with ${res.status} status`);
+        return
     }else if (!res.headers.get("content-type").includes("text/html")){
         //console.log(res.headers)
-        throw new Error(`Response content type is not text/html`)
-    }else{
-        let bodyText = await res.text()
-        console.log(typeof bodyText)
+        console.log(`Response content type is not text/html`)
+        return
     }
+
+    let bodyText = await res.text()
+    return bodyText
+}
+
+async function crawlPage(baseUrl, currentUrl=baseUrl, pages={}){
+    const baseUrlObj = new URL(baseUrl)
+    const currentUrlObj = new URL(currentUrl)
+    if (baseUrlObj.hostname != currentUrlObj.hostname){
+        return pages
+    }
+    if (normalizeURL(currentUrl) in pages){
+        pages[normalizeURL(currentUrl)] += 1
+        return pages
+    }else{
+        pages[normalizeURL(currentUrl)] = 1
+    }
+
+    
+    let bodyText = await fetchHTML(currentUrl)
+    if (!bodyText){
+        return pages
+    }
+    let urlList = getUrlFromHtml(bodyText, currentUrl)
+    for(let i=0;i<urlList.length;i++){
+        pages = await crawlPage(baseUrl, ("https://"+urlList[i]), pages) 
+    }
+    return pages
 }
 
 export {normalizeURL, convertRelativeToAbs, getAnchorEle, getUrlFromHtml, crawlPage};

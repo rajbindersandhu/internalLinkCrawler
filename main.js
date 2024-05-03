@@ -1,4 +1,5 @@
 import {crawlPage} from "./crawl.js"
+import {generateReport} from "./report.js"
 async function main(){
     const cliArgs = (process.argv).slice(2)
     if (cliArgs.length == 0){
@@ -9,7 +10,12 @@ async function main(){
         console.log(`Recievd base URL: ${cliArgs[0]}, Starting the crawler...`)
     }
 
-    await crawlPage(cliArgs)
+    let rslt = await crawlPage(cliArgs)
+
+    console.log("Ending the crawler...")
+    console.log("Generating final report: ")
+    
+    generateReport(rslt)
 }
 
 await main()
